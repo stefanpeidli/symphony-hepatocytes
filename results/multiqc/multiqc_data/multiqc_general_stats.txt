@@ -1,4 +1,7 @@
-Sample	FastQC_mqc-generalstats-fastqc-percent_duplicates	FastQC_mqc-generalstats-fastqc-percent_gc	FastQC_mqc-generalstats-fastqc-avg_sequence_length	FastQC_mqc-generalstats-fastqc-median_sequence_length	FastQC_mqc-generalstats-fastqc-percent_fails	FastQC_mqc-generalstats-fastqc-total_sequences
-Hepa-library-1_S10_L001_R1_001	93.90131241293349	51.0	170.0	170	36.36363636363637	68195.0
-Hepa-library-2_S11_L001_R1_001	93.8659355811008	51.0	170.0	170	36.36363636363637	62373.0
-Hepa-library-3_S12_L001_R1_001	93.54284108379758	51.0	170.0	170	36.36363636363637	60491.0
+Sample	Samtools_mqc-generalstats-samtools-error_rate	Samtools_mqc-generalstats-samtools-non_primary_alignments	Samtools_mqc-generalstats-samtools-reads_mapped	Samtools_mqc-generalstats-samtools-reads_mapped_percent	Samtools_mqc-generalstats-samtools-reads_properly_paired_percent	Samtools_mqc-generalstats-samtools-reads_MQ0_percent	Samtools_mqc-generalstats-samtools-raw_total_sequences	FastQC_mqc-generalstats-fastqc-percent_duplicates	FastQC_mqc-generalstats-fastqc-percent_gc	FastQC_mqc-generalstats-fastqc-avg_sequence_length	FastQC_mqc-generalstats-fastqc-median_sequence_length	FastQC_mqc-generalstats-fastqc-percent_fails	FastQC_mqc-generalstats-fastqc-total_sequences
+Hepa-library-1_S10_L001_R1_001								93.90131241293349	51.0	170.0	170	36.36363636363637	68195.0
+Hepa-library-1_S10_stats	0.0	0.0	0.0	0.0	0.0	0.0	68195.0						
+Hepa-library-2_S11_L001_R1_001								93.8659355811008	51.0	170.0	170	36.36363636363637	62373.0
+Hepa-library-2_S11_stats	0.0	0.0	0.0	0.0	0.0	0.0	62373.0						
+Hepa-library-3_S12_L001_R1_001								93.54284108379758	51.0	170.0	170	36.36363636363637	60491.0
+Hepa-library-3_S12_stats	0.0	0.0	0.0	0.0	0.0	0.0	60491.0						
