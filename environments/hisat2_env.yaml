@@ -1,0 +1,7 @@
+name: hisat2_env
+
+channels:
+ - bioconda
+
+dependencies:
+  - bioconda::hisat2=2.2.1

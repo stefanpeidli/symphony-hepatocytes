@@ -1,0 +1,20 @@
+name: gscreend_env
+
+channels:
+ - conda-forge
+ - bioconda
+
+dependencies:
+  - python=3
+  - conda-forge::r-base=4.3.2
+  - conda-forge::r-irkernel
+  - conda-forge::r-optparse
+  - conda-forge::jupyter
+  - bioconda::bioconductor-gscreend=1.14.0
+  - bioconda::bioconductor-summarizedexperiment
+  - conda-forge:r-tidyverse
+  - conda-forge:r-readr
+  - conda-forge:r-dplyr
+  - conda-forge:r-stringr
+  - conda-forge:r-tidyr
+  - conda-forge:r-ggplot2

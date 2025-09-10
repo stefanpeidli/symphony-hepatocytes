@@ -1,0 +1,7 @@
+# File paths, please adapt to your local setup
+TEMPDIR: "/scratch/peidli/SYMPHONY/SYM_HEPA/"  # place to store temporary files (lots of data)
+DATADIR: "/g/huber/users/peidli/data/SYMPHONY/SYM_HEPA/"  # fastqs are here
+SAMPLES:
+  - Hepa-library-1_S10
+  - Hepa-library-2_S11
+  - Hepa-library-3_S12

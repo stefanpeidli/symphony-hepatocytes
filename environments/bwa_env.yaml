@@ -1,0 +1,8 @@
+name: bwa_env
+
+channels:
+ - bioconda
+ - defaults
+
+dependencies:
+  - bioconda::bwa=0.7.19

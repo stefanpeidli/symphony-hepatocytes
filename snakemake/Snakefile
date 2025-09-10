@@ -1,0 +1,205 @@
+"""
+Author: Stefan Peidli
+Title: Snakemake workflow for SYMPHONY experiment HEPA.
+Last Updated: 11.09.2025
+Run: snakemake
+Create DAG: snakemake --forceall --dag | dot -Tpdf > ../results/pipeline/snake_dag.pdf
+Create Rulegraph: snakemake --forceall --rulegraph | dot -Tpdf > ../results/pipeline/snake_rulegraph.pdf
+Description:
+    This snakemake workflow starts does the following:
+    - Upstream processing
+        - Download FASTQ files from BaseSpace
+        - Run FastQC / MultiQC on the FASTQ files
+        - Trim the FASTQ files with a custom script
+        - Align the trimmed FASTQ files to the guides with HISAT2
+        - Count the number of reads per guide using samtools
+        - Merges the counts into a single table "SYM_HEPA_counts.csv"
+    - Downstream processing
+        - Runs MAGeCK
+        - Runs BAGEL2
+        - Runs Gscreend
+    All user configuration is done in the configuration/config.yaml file.
+"""
+
+import pandas as pd
+from pathlib import Path
+from snakemake.utils import min_version
+
+### CONFIGURATION ###
+min_version("8")
+configfile: "../configuration/config.yaml"
+conda: "../environments/snake_env.yaml"
+
+### PATHS ###
+TEMPDIR = Path(config['TEMPDIR'])
+DATADIR = Path(config['DATADIR'])
+
+### SAMPLES ###
+SAMPLES = config['SAMPLES']
+# sample_names = list(pd.read_csv('../resources/SYM_HEPA_fastqs.txt', sep='\t', index_col=0).index)
+# sample_names = [x for x in sample_names if 'Undetermined_S0' not in x]
+# assert len(sample_names) == 6*(3*3) + 3, f"Expected 57 (6TP x 3lines x 3reps + 3 Pools) samples, got " + str(len(sample_names))
+# guide_df = pd.read_csv('../resources/all_gRNA_data.csv', index_col='unique_guide_name')
+# cell_line_dict = config['cell_lines']
+# cell_lines = list(cell_line_dict.values())
+# ena_sample_mapping = pd.read_csv("../resources/ENA/ENA_samples_PRJEB82598.tsv", index_col=15, sep='\t')
+# sample_long_to_short = {x: x.split('_')[0] for x in sample_names} # long name includes _SXX sample number suffix
+
+### Define Outputs of this Workflow ###
+rule all:
+    input:
+        # Read processing and quantification
+        ## QC
+        "../results/multiqc/multiqc.html",
+        '../resources/library/SYM_HEPA_guides.fa'
+        ## Counts
+        # TEMPDIR / 'SYM_HEPA_counts.csv',
+        # TEMPDIR / 'SYM_HEPA_counts_filtered.csv',  # removed "bad" guides identified with MAGeCK
+        # TEMPDIR / 'SYM_HEPA_counts_corrected.csv',  # corrected sample swap
+
+### Read processing and quantification ###
+rule fastqc:
+    # Produces FastQC reports for the raw FASTQ files.
+    input:
+        DATADIR / 'fastq/{sample}_L001_R1_001.fastq.gz'
+    output:
+        html=TEMPDIR / "fastqc/{sample}_L001.html",
+        zip=TEMPDIR / "fastqc/{sample}_L001_fastqc.zip" # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
+    params:
+        extra = "--quiet"
+    threads: 4
+    resources:
+        mem_mb = 1024
+    wrapper:
+        "v3.3.5/bio/fastqc"
+
+rule multiqc:
+    # Produces a MultiQC report from the FastQC reports and samtools stats.
+    input:
+        fastqc=expand(TEMPDIR / "fastqc/{sample}_L001.html", sample=SAMPLES),
+    output:
+        "../results/multiqc/multiqc.html",
+        directory("../results/multiqc/multiqc_data"),
+    params:
+        extra="--data-dir",  # Optional: extra parameters for multiqc.
+    log:
+        "logs/multiqc.log",
+    wrapper:
+        "v3.3.5/bio/multiqc"
+
+rule guide_to_fasta:
+    # Converts the guide sequences to FASTA format for alignment with HISAT2.
+    input:
+        '../resources/library/sym_hepa_library_map.csv'
+    output:
+        '../resources/library/SYM_HEPA_guides.fa'
+    run:
+        from tqdm.auto import tqdm
+        guide_df = pd.read_csv(input[0], index_col='guide_name')
+        print('Converting to FASTA!')
+        with open(output[0], 'w') as OUTPUT:
+            for index, row in tqdm(guide_df.iterrows()):
+                OUTPUT.write(f'>{index}\n')
+                OUTPUT.write(f'{row.barcode}\n')
+        print('Done!')
+
+rule hisat2_guide_index:
+    # Builds the HISAT2 index for the guide sequences.
+    input:
+        '../resources/library/SYM_HEPA_guides.fa'
+    output:
+        expand(TEMPDIR / 'hisat2/index.{i}.ht2', i=range(1,9))
+    threads: 8
+    conda: "../environments/hisat2_env.yaml"
+    shell:
+        """
+        hisat2-build -p {threads} {input} {TEMPDIR}/hisat2/index
+        """
+
+rule hisat2_align:
+    # Aligns the trimmed FASTQ files to the guides using HISAT2. (Looking back, bowtie2 would have been a better choice)
+    input:
+        fastq=DATADIR / 'fastq/{sample}_L001_R1_001.fastq.gz',
+        index=expand(TEMPDIR / 'hisat2/index.{i}.ht2', i=range(1,9))
+    output:
+        sam=TEMPDIR / 'hisat2/{sample}_L00{i}_R1_001_custom_trimmed.sam'
+    resources:
+        time='04:00:00',
+        mem_mb=32000,
+        disk_mb=32000
+    threads: 8
+    conda: "../environments/hisat2_env.yaml"
+    shell:
+        """
+        hisat2 \
+        -x {TEMPDIR}/hisat2/index \
+        -U {input.fastq} \
+        -S {output.sam} \
+        -p {threads}
+        """
+
+# rule samtools_stats:
+#     # Generates statistics from the SAM files using samtools.
+#     input:
+#         sam=TEMPDIR / 'hisat2/{sample}_L00{i}_R1_001_custom_trimmed.sam'
+#     output:
+#         stats=TEMPDIR / 'hisat2/{sample}_L00{i}_R1_001_custom_trimmed_stats.txt'
+#     resources:
+#         time='01:00:00',
+#         mem_mb=16000,
+#         disk_mb=16000
+#     threads: 8
+#     conda: "../environments/samtools_env.yaml"
+#     shell:
+#         """
+#         samtools stats -@ {threads} {input.sam} > {output.stats}
+#         """
+
+# rule count:
+#     # Read quantification using samtools.
+#     input:
+#         sam=TEMPDIR / 'hisat2/{sample}_L00{i}_R1_001_custom_trimmed.sam'
+#     output:
+#         counts=TEMPDIR / 'counts/{sample}_L00{i}_counts.txt'
+#     resources:
+#         time='01:00:00',
+#         mem_mb=16000,
+#         disk_mb=16000
+#     threads: 4
+#     conda: "../environments/samtools_env.yaml"
+#     script:
+#         "scripts/snake_count_reads.sh"
+
+# rule merge_counts:
+#     # Merges the counts from all samples into a single table.
+#     input:
+#         counts=expand(TEMPDIR / 'counts/{sample}_L00{i}_counts.txt', sample=sample_names, i=[1,2]),
+#         guide_df='../resources/all_gRNA_data.csv'
+#     output:
+#         TEMPDIR / 'SYM_HEPA_counts.csv'
+#     run:
+#         guide_df = pd.read_csv(input.guide_df, index_col='unique_guide_name')
+#         counts = {Path(x).name.split('_counts')[0]: pd.read_csv(x, sep='\t', header=None, index_col=0) for x in input.counts}
+#         df = pd.concat(counts, axis=1)
+#         df.columns = df.columns.droplevel(1)
+#         df.index.name = 'unique_guide_name'
+#         df = df.fillna(0)  # fill nans with zeros
+#         # collapse lanes
+#         df = df.T
+#         df['sample_name'] = [x.split('_S')[0] for x in df.index]  # remove sample number by Illumina and lane
+#         df = df.groupby('sample_name').sum().T
+#         for c in df.columns: df[c] = df[c].astype('int64')  # make integer
+#         df = pd.merge(guide_df, df, how='right', left_index=True, right_index=True)  # add guide info
+#         df.to_csv(output[0])
+
+# rule correct_sample_swap:
+#     # Corrects the sample swap that occurred during the experiment. (sym-01-01-TP6 and sym-01-02-TP6 were swapped across replicates 1 and 2)
+#     input:
+#         TEMPDIR / 'SYM_HEPA_counts.csv'
+#     output:
+#         TEMPDIR / 'SYM_HEPA_counts_corrected.csv'
+#     run:
+#         # Correct sample swap
+#         df = pd.read_csv(input[0], index_col=0)
+#         df = df.rename({'sym-01-01-TP6' : 'sym-01-02-TP6', 'sym-01-02-TP6' : 'sym-01-01-TP6'}, axis=1)  # revert sample swap
+#         df.to_csv(output[0])

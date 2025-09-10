@@ -1,0 +1,17 @@
+name: snake_env
+
+channels:
+ - conda-forge
+ - bioconda
+
+dependencies:
+ - conda-forge::python=3.11
+ - conda-forge::tqdm=4.66.1
+ - numpy=1.26.4
+ - pandas=1.5.3
+ - conda-forge::seaborn=0.11.2
+ - conda-forge::matplotlib
+ - conda-forge::nbformat=5.0.8  # >5.1 causes issues with jupyter ("id" tag)
+ - conda-forge::jupyter
+ - conda-forge::ipykernel
+ - conda-forge::nbconvert

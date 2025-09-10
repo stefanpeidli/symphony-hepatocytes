@@ -1,0 +1,9 @@
+name: igv_env
+
+channels:
+ - bioconda
+
+dependencies:
+  - bioconda::htslib
+  - bioconda::bedops
+  - bioconda::tabix

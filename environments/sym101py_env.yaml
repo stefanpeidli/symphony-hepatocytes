@@ -1,0 +1,29 @@
+name: sym101py_env
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  - conda-forge::python=3.11
+  - conda-forge::tqdm
+  - conda-forge::numpy=1.26.4  # fastcluster needs numpy < 2
+  - conda-forge::pandas=2.2.3
+  - conda-forge::scipy
+  - conda-forge::seaborn=0.13.2
+  - conda-forge::matplotlib
+  - conda-forge::nbformat=5.0  # >5.1 causes issues with jupyter ("id" tag)
+  - conda-forge::jupyter
+  - conda-forge::ipykernel
+  - conda-forge::nbconvert
+  - conda-forge::mscorefonts
+  - conda-forge::pyyaml
+  - conda-forge::fastcluster
+  - conda-forge::scikit-learn
+  - conda-forge::openpyxl
+  - conda-forge::adjusttext
+  - conda-forge::statannotations
+  - bioconda::pysam=0.23.3
+  - bioconda::pyranges=0.1.4
+  - pip:
+    - PyComplexHeatmap==1.6.6

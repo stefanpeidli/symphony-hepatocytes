@@ -1,0 +1,4 @@
+Module	Section	Sample Name	Source
+FastQC	all_sections	Hepa-library-1_S10_L001_R1_001	/scratch/peidli/SYMPHONY/SYM_HEPA/fastqc/Hepa-library-1_S10_L001_fastqc.zip
+FastQC	all_sections	Hepa-library-2_S11_L001_R1_001	/scratch/peidli/SYMPHONY/SYM_HEPA/fastqc/Hepa-library-2_S11_L001_fastqc.zip
+FastQC	all_sections	Hepa-library-3_S12_L001_R1_001	/scratch/peidli/SYMPHONY/SYM_HEPA/fastqc/Hepa-library-3_S12_L001_fastqc.zip
