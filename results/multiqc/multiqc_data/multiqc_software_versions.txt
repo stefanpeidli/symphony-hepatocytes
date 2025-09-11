@@ -1,3 +1,2 @@
-Sample	Samtools	FastQC
-FastQC		0.12.1
-Samtools	1.9	
+Sample	FastQC
+FastQC	0.12.1

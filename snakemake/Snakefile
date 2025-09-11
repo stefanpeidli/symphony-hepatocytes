@@ -2,7 +2,7 @@
 Author: Stefan Peidli
 Title: Snakemake workflow for SYMPHONY experiment HEPA.
 Last Updated: 11.09.2025
-Run: snakemake
+Run: snakemake --use-conda --cores 16
 Create DAG: snakemake --forceall --dag | dot -Tpdf > ../results/pipeline/snake_dag.pdf
 Create Rulegraph: snakemake --forceall --rulegraph | dot -Tpdf > ../results/pipeline/snake_rulegraph.pdf
 Description:
@@ -42,19 +42,25 @@ rule all:
     input:
         # Read processing and quantification
         ## QC
-        # "../results/multiqc/multiqc.html",
-        # '../resources/library/SYM_HEPA_guides.fa',
-        ## Counts
-        expand(TEMPDIR / "trimmed/{sample}_{part}.fastq", sample=SAMPLES, part=['barcodes', 'guides']),
-        # TEMPDIR / 'SYM_HEPA_counts.csv',
-        # TEMPDIR / 'SYM_HEPA_counts_filtered.csv',  # removed "bad" guides identified with MAGeCK
-        # TEMPDIR / 'SYM_HEPA_counts_corrected.csv',  # corrected sample swap
+        "../results/multiqc/multiqc.html",
+        ## Counts etc
+        expand(DATADIR / "mapped_reads/{sample}_{part}_mapped.csv", sample=SAMPLES, part=['barcodes', 'guides']),
+        DATADIR / "mapped_reads/merged_mapping.csv",
 
 ### Read processing and quantification ###
+rule unpack_fastq:
+    # unzips FASTQ files
+    input:
+        DATADIR / 'fastq/{sample}_L001_R1_001.fastq.gz'
+    output:
+        TEMPDIR / 'fastq/{sample}.fastq'
+    shell:
+        "gunzip -c {input} > {output}"
+
 rule fastqc:
     # Produces FastQC reports for the raw FASTQ files.
     input:
-        DATADIR / 'fastq/{sample}_L001_R1_001.fastq.gz'
+        TEMPDIR / 'fastq/{sample}.fastq'
     output:
         html=TEMPDIR / "fastqc/{sample}.html",
         zip=TEMPDIR / "fastqc/{sample}_fastqc.zip" # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
@@ -70,7 +76,8 @@ rule multiqc:
     # Produces a MultiQC report from the FastQC reports and samtools stats.
     input:
         fastqc=expand(TEMPDIR / "fastqc/{sample}.html", sample=SAMPLES),
-        samtools=expand(TEMPDIR / 'hisat2/{sample}_stats.txt', sample=SAMPLES)
+        cutadapt=expand(TEMPDIR / "trimmed/QC/{sample}_barcodes.qc.txt", sample=SAMPLES),
+        cutadapt2=expand(TEMPDIR / "trimmed/QC/{sample}_guides.qc.txt", sample=SAMPLES),
     output:
         "../results/multiqc/multiqc.html",
         directory("../results/multiqc/multiqc_data"),
@@ -83,7 +90,7 @@ rule multiqc:
 
 rule cutadapt_barcode_trim:
     input:
-        DATADIR / 'fastq/{sample}_L001_R1_001.fastq.gz'
+        TEMPDIR / 'fastq/{sample}.fastq'
     output:
         fastq=TEMPDIR / "trimmed/{sample}_barcodes.fastq",
         qc=TEMPDIR / "trimmed/QC/{sample}_barcodes.qc.txt",
@@ -100,7 +107,7 @@ rule cutadapt_barcode_trim:
 
 rule cutadapt_guide_trim:
     input:
-        DATADIR / 'fastq/{sample}_L001_R1_001.fastq.gz'
+        TEMPDIR / 'fastq/{sample}.fastq'
     output:
         fastq=TEMPDIR / "trimmed/{sample}_guides.fastq",
         qc=TEMPDIR / "trimmed/QC/{sample}_guides.qc.txt",
@@ -114,3 +121,61 @@ rule cutadapt_guide_trim:
         mem_mb = 16000
     wrapper:
         "v7.2.0/bio/cutadapt/se"
+
+rule read_mapping:
+    input:
+        fastq=TEMPDIR / "trimmed/{sample}_{part}.fastq",
+        reference="../resources/library/sym_hepa_library_map.csv"
+    output:
+        mapped=DATADIR / "mapped_reads/{sample}_{part}_mapped.csv",
+        unmapped=DATADIR / "mapped_reads/{sample}_{part}_unmapped.csv",
+    wildcard_constraints:
+        part="barcodes|guides"
+    params:
+        max_effective_mismatches = 1,
+        max_mismatches = 3,
+        quality_threshold = 30,
+    threads: 16
+    resources:
+        mem_mb = 16000
+    conda:
+        "../environments/bio_env.yaml"
+    script:
+        "scripts/snake_counting.py"
+
+rule merge_mappings:
+    input:
+        expand(DATADIR / "mapped_reads/{sample}_barcodes_mapped.csv", sample=SAMPLES),
+        expand(DATADIR / "mapped_reads/{sample}_barcodes_unmapped.csv", sample=SAMPLES),
+        expand(DATADIR / "mapped_reads/{sample}_guides_mapped.csv", sample=SAMPLES),
+        expand(DATADIR / "mapped_reads/{sample}_guides_unmapped.csv", sample=SAMPLES),
+        reference="../resources/library/sym_hepa_library_map.csv"
+    output:
+        DATADIR / "mapped_reads/merged_mapping.csv",
+    run:
+        guides = pd.read_csv(input.reference, index_col="gRNA").guide_name.to_dict()
+        barcodes = pd.read_csv(input.reference, index_col="barcode").guide_name.to_dict()
+        read_dfs = {}
+        for sample in SAMPLES:
+            guide_df = pd.read_csv(DATADIR / f'mapped_reads/{sample}_guides_mapped.csv', index_col=0)
+            barcode_df = pd.read_csv(DATADIR / f'mapped_reads/{sample}_barcodes_mapped.csv', index_col=0)
+            unmatched_guides = pd.read_csv(DATADIR / f'mapped_reads/{sample}_guides_unmapped.csv')
+            unmatched_barcodes = pd.read_csv(DATADIR / f'mapped_reads/{sample}_barcodes_unmapped.csv')
+            read_df = pd.merge(guide_df, barcode_df, left_index=True, right_index=True, how='outer', suffixes=('_guide', '_barcode'))
+            # add unmatched reads
+            read_df = pd.concat([
+                read_df,
+                pd.DataFrame(index=unmatched_guides.read_id).assign(guide=None, mismatches_guide=None, effective_mismatches_guide=None, barcode=None, mismatches_barcode=None, effective_mismatches_barcode=None),
+                pd.DataFrame(index=unmatched_barcodes.read_id).assign(guide=None, mismatches_guide=None, effective_mismatches_guide=None, barcode=None, mismatches_barcode=None, effective_mismatches_barcode=None),
+            ])
+            read_dfs[sample] = read_df
+        read_df = pd.concat(read_dfs)
+        read_df['guide_says'] = read_df.guide.map(guides)
+        read_df['barcode_says'] = read_df.barcode.map(barcodes)
+        read_df['read_type'] = ['matching_guide_and_barcode' if g == b else
+                                'mismatched_guide_and_barcode' if pd.notna(g) and pd.notna(b) else
+                                'guide_only' if pd.notna(g) else
+                                'barcode_only' if pd.notna(b) else
+                                'unmapped' for g, b in zip(read_df['guide_says'], read_df['barcode_says'])]
+        read_df.reset_index(level=0, names='sample', inplace=True)
+        read_df.to_csv(output[0])
