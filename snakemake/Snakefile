@@ -165,13 +165,13 @@ rule merge_mappings:
             # add unmatched reads
             read_df = pd.concat([
                 read_df,
-                pd.DataFrame(index=unmatched_guides.read_id).assign(guide=None, mismatches_guide=None, effective_mismatches_guide=None, barcode=None, mismatches_barcode=None, effective_mismatches_barcode=None),
-                pd.DataFrame(index=unmatched_barcodes.read_id).assign(guide=None, mismatches_guide=None, effective_mismatches_guide=None, barcode=None, mismatches_barcode=None, effective_mismatches_barcode=None),
+                pd.DataFrame(index=unmatched_guides.read_id).assign(match_guide=None, mismatches_guide=None, effective_mismatches_guide=None, match_barcode=None, mismatches_barcode=None, effective_mismatches_barcode=None),
+                pd.DataFrame(index=unmatched_barcodes.read_id).assign(match_guide=None, mismatches_guide=None, effective_mismatches_guide=None, match_barcode=None, mismatches_barcode=None, effective_mismatches_barcode=None),
             ])
             read_dfs[sample] = read_df
         read_df = pd.concat(read_dfs)
-        read_df['guide_says'] = read_df.guide.map(guides)
-        read_df['barcode_says'] = read_df.barcode.map(barcodes)
+        read_df['guide_says'] = read_df.match_guide.map(guides)
+        read_df['barcode_says'] = read_df.match_barcode.map(barcodes)
         read_df['read_type'] = ['matching_guide_and_barcode' if g == b else
                                 'mismatched_guide_and_barcode' if pd.notna(g) and pd.notna(b) else
                                 'guide_only' if pd.notna(g) else

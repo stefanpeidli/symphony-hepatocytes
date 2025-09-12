@@ -1,0 +1,4 @@
+Sample	cutadapt_version	r_processed	r_with_adapters	r_written	bp_processed	bp_written	percent_trimmed
+Hepa-library-1_S10	5.1	68195	56819	68195	11593150	1022745	91.17802322923451
+Hepa-library-2_S11	5.1	62373	53498	62373	10603410	1433913	86.47686923357675
+Hepa-library-3_S12	5.1	60491	51800	60491	10283470	1390549	86.47782314724505
